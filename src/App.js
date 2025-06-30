@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Papa from 'papaparse';
 
 function App() {
@@ -8,9 +8,11 @@ function App() {
     const [missingTranslations, setMissingTranslations] = useState([]);
     const [jsonFileName, setJsonFileName] = useState('');
     const [csvFileName, setCsvFileName] = useState('');
+    const [showTooltip, setShowTooltip] = useState(false);
 
     const jsonInputRef = useRef(null);
     const csvInputRef = useRef(null);
+    const tooltipRef = useRef(null);
 
     const handleJsonUpload = (e) => {
         const file = e.target.files[0];
@@ -60,7 +62,6 @@ function App() {
         setMissingKeys(missing);
 
         const translationIssues = [];
-
         const ignoredColumns = ['SPA.key', 'Default.key', 'Android.key', 'iOS.key', 'Brand', 'Tag'];
         const languageColumns = Object.keys(csvData[0]).filter(
             col => !ignoredColumns.includes(col)
@@ -83,8 +84,7 @@ function App() {
                         <div key={key}>
                             <b>{key}</b><br />
                             отсутствуют переводы для: {missingLangs.join(', ')}
-                            <br/>
-                            <br/>
+                            <br /><br />
                         </div>
                     );
                 }
@@ -96,7 +96,6 @@ function App() {
 
     const listStyle = { listStyleType: 'none', paddingLeft: 0 };
 
-    // Цвета и стили, близкие к Bootstrap
     const btnPrimary = {
         backgroundColor: '#339af0',
         color: 'white',
@@ -110,10 +109,7 @@ function App() {
         userSelect: 'none',
     };
 
-    const btnPrimaryHover = {
-        backgroundColor: '#228be6',
-    };
-
+    const btnPrimaryHover = { backgroundColor: '#228be6' };
     const btnSuccess = {
         backgroundColor: '#198754',
         color: 'white',
@@ -126,18 +122,9 @@ function App() {
         userSelect: 'none',
         marginTop: '10px',
     };
+    const btnSuccessHover = { backgroundColor: '#146c43' };
+    const btnDisabled = { backgroundColor: '#6c757d', cursor: 'not-allowed', opacity: 0.65 };
 
-    const btnSuccessHover = {
-        backgroundColor: '#146c43',
-    };
-
-    const btnDisabled = {
-        backgroundColor: '#6c757d',
-        cursor: 'not-allowed',
-        opacity: 0.65,
-    };
-
-    // Хук для hover-эффекта
     const useHover = () => {
         const [hovered, setHovered] = useState(false);
         const onMouseEnter = () => setHovered(true);
@@ -149,12 +136,72 @@ function App() {
     const [csvBtnEvents, csvBtnHovered] = useHover();
     const [compareBtnEvents, compareBtnHovered] = useHover();
 
-    // Проверяем, загружены ли оба файла для разблокировки кнопки "Сравнить"
     const isCompareDisabled = !(jsonFileName && csvFileName);
 
+    // Закрытие тултипа при клике вне
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (tooltipRef.current && !tooltipRef.current.contains(event.target)) {
+                setShowTooltip(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-            <h2>Сравнение ключей и переводов</h2>
+        <div style={{ padding: '20px', fontFamily: 'Arial', position: 'relative' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+                Сравнение ключей и переводов
+                <span
+                    onClick={() => setShowTooltip(!showTooltip)}
+                    style={{
+                        display: 'inline-block',
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: '#339af0',
+                        color: 'white',
+                        textAlign: 'center',
+                        lineHeight: '20px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        userSelect: 'none'
+                    }}
+                >
+                    ?
+                </span>
+                {showTooltip && (
+                    <div
+                        ref={tooltipRef}
+                        style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            marginTop: '8px',
+                            backgroundColor: '#f8f9fa',
+                            color: '#333',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px',
+                            padding: '10px',
+                            width: '300px',
+                            fontSize: '14px',
+                            zIndex: 100,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                        }}
+                    >
+                        Загружаем в JSON fallback.json файл<br/>
+                        Загружаем в CSV export.csv файл
+                        <br/><br/>
+                        fallback.json - это ключи, которые SPA фронтенд использует реально<br/>
+                        export.csv - все переводы из админки
+                        <br/><br/>
+                        Выводится список отсутствующих переводов.<br/>
+                        Проверка идет только по SPA.key
+                    </div>
+                )}
+            </h2>
 
             <div style={{ marginBottom: '10px' }}>
                 <input
@@ -165,14 +212,11 @@ function App() {
                     onChange={handleJsonUpload}
                 />
                 <button
-                    style={{
-                        ...btnPrimary,
-                        ...(jsonBtnHovered ? btnPrimaryHover : {})
-                    }}
+                    style={{ ...btnPrimary, ...(jsonBtnHovered ? btnPrimaryHover : {}) }}
                     {...jsonBtnEvents}
                     onClick={() => jsonInputRef.current.click()}
                 >
-                    Загрузить JSON (фронтенд SPA)
+                    Загрузить JSON (SPA)
                 </button>
                 {jsonFileName && <div style={{ marginTop: '5px', color: 'green' }}>{jsonFileName}</div>}
             </div>
@@ -186,10 +230,7 @@ function App() {
                     onChange={handleCsvUpload}
                 />
                 <button
-                    style={{
-                        ...btnPrimary,
-                        ...(csvBtnHovered ? btnPrimaryHover : {})
-                    }}
+                    style={{ ...btnPrimary, ...(csvBtnHovered ? btnPrimaryHover : {}) }}
                     {...csvBtnEvents}
                     onClick={() => csvInputRef.current.click()}
                 >
